@@ -1,4 +1,7 @@
 import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import "dotenv/config";
 import cors from "cors";
 import express from "express";
@@ -13,6 +16,9 @@ import { compactText, normalizeResumePayload, resumeToText } from "./resumeUtils
 const app = express();
 const port = process.env.PORT || 3001;
 const sessionLifetimeMs = 1000 * 60 * 60 * 24 * 30;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const clientDistPath = path.resolve(__dirname, "../../client/dist");
 
 app.use(cors());
 app.use(express.json({ limit: "2mb" }));
@@ -358,6 +364,21 @@ app.post("/api/analyze", (request, response) => {
   const result = analyzeResume(resumeText, vacancyText);
   return response.json(result);
 });
+
+app.use("/api", (_request, response) => {
+  response.status(404).json({ message: "Маршрут не найден." });
+});
+
+if (fs.existsSync(clientDistPath)) {
+  app.use(express.static(clientDistPath));
+  app.get("*", (request, response, next) => {
+    if (request.path.startsWith("/api")) {
+      return next();
+    }
+
+    return response.sendFile(path.join(clientDistPath, "index.html"));
+  });
+}
 
 app.use((error, _request, response, _next) => {
   console.error(error);
